@@ -1,0 +1,308 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Team {
+  id            String       @id @default(cuid())
+  name          String
+  nameKana      String?      @map("name_kana")
+  prefecture    String
+  city          String?
+  category      TeamCategory @default(CLUB)
+  league        String?
+  trainingArea  String?      @map("training_area")
+  homeGround    String?      @map("home_ground")
+  monthlyFee    String?      @map("monthly_fee")
+  practiceDays  String?      @map("practice_days")
+  officialSiteUrl String?    @map("official_site_url")
+  instagramUrl  String?      @map("instagram_url")
+  xUrl          String?      @map("x_url")
+  facebookUrl   String?      @map("facebook_url")
+  isActive      Boolean      @default(true) @map("is_active")
+  memo          String?
+
+  sources       TeamSource[]
+  recruitments  Recruitment[]
+  detectedPages DetectedPage[]
+  changeLogs    ChangeLog[]
+  standings     LeagueStanding[]
+
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  @@map("teams")
+}
+
+model LeagueStanding {
+  id           String   @id @default(cuid())
+  teamId       String   @map("team_id")
+  season       String   @default("2025")
+  ageGroup     AgeGroup @default(U13) @map("age_group")
+  leagueName   String   @map("league_name")
+  rank         Int?
+  played       Int      @default(0)
+  wins         Int      @default(0)
+  draws        Int      @default(0)
+  losses       Int      @default(0)
+  goalsFor     Int      @default(0) @map("goals_for")
+  goalsAgainst Int      @default(0) @map("goals_against")
+  points       Int      @default(0)
+
+  team         Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([teamId, season, ageGroup])
+  @@map("league_standings")
+}
+
+model TeamSource {
+  id                  String     @id @default(cuid())
+  teamId              String     @map("team_id")
+  sourceType          SourceType @map("source_type")
+  url                 String
+  crawlEnabled        Boolean    @default(true) @map("crawl_enabled")
+  crawlIntervalHours  Int        @default(6) @map("crawl_interval_hours")
+  lastCheckedAt       DateTime?  @map("last_checked_at")
+  lastSuccessAt       DateTime?  @map("last_success_at")
+  lastHash            String?    @map("last_hash")
+  lastError           String?    @map("last_error")
+
+  team                Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  crawlLogs           CrawlLog[]
+
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
+
+  @@unique([teamId, url])
+  @@map("team_sources")
+}
+
+model Recruitment {
+  id                    String           @id @default(cuid())
+  teamId                String           @map("team_id")
+  targetYear            Int              @default(2027) @map("target_year")
+  targetGrade           String?          @map("target_grade")
+  title                 String
+  recruitmentType       RecruitmentType  @map("recruitment_type")
+  status                RecruitmentStatus @default(DETECTED)
+
+  eventDate             DateTime?        @map("event_date")
+  eventStartTime        String?          @map("event_start_time")
+  eventEndTime          String?          @map("event_end_time")
+  venue                 String?
+  address               String?
+  applicationStartDate  DateTime?        @map("application_start_date")
+  applicationDeadline   DateTime?        @map("application_deadline")
+  applicationUrl        String?          @map("application_url")
+  fee                   String?
+  capacity              String?
+  targetPositions       String?          @map("target_positions")
+  isGkRecruiting        Boolean          @default(false) @map("is_gk_recruiting")
+
+  sourceUrl             String?          @map("source_url")
+  sourceType            SourceType?      @map("source_type")
+  confidenceScore       Float            @default(0) @map("confidence_score")
+  confidenceLabel       ConfidenceLabel  @default(D) @map("confidence_label")
+  extractedText         String?          @map("extracted_text")
+  adminNote             String?          @map("admin_note")
+  publishedAt           DateTime?        @map("published_at")
+
+  team                  Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  adminReviews          AdminReview[]
+  changeLogs            ChangeLog[]
+
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+
+  @@map("recruitments")
+}
+
+model DetectedPage {
+  id                String     @id @default(cuid())
+  teamId            String?    @map("team_id")
+  url               String
+  title             String?
+  description       String?
+  contentText       String?    @map("content_text")
+  contentHash       String?    @map("content_hash")
+  detectedKeywords  String[]   @map("detected_keywords")
+  sourceType        SourceType @map("source_type")
+  isProcessed       Boolean    @default(false) @map("is_processed")
+  aiExtractedJson   Json?      @map("ai_extracted_json")
+
+  team              Team?      @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+
+  @@unique([url])
+  @@map("detected_pages")
+}
+
+model CrawlLog {
+  id           String          @id @default(cuid())
+  sourceId     String          @map("source_id")
+  status       CrawlStatus
+  httpStatus   Int?            @map("http_status")
+  errorMessage String?         @map("error_message")
+  checkedAt    DateTime        @default(now()) @map("checked_at")
+  durationMs   Int?            @map("duration_ms")
+
+  source       TeamSource      @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@map("crawl_logs")
+}
+
+model ChangeLog {
+  id            String     @id @default(cuid())
+  teamId        String?    @map("team_id")
+  recruitmentId String?    @map("recruitment_id")
+  changeType    ChangeType @map("change_type")
+  beforeJson    Json?      @map("before_json")
+  afterJson     Json?      @map("after_json")
+  sourceUrl     String?    @map("source_url")
+
+  team          Team?        @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  recruitment   Recruitment? @relation(fields: [recruitmentId], references: [id], onDelete: SetNull)
+
+  createdAt     DateTime   @default(now()) @map("created_at")
+
+  @@map("change_logs")
+}
+
+model LineSubscription {
+  id          String   @id @default(cuid())
+  lineUserId  String   @unique @map("line_user_id")
+  displayName String?  @map("display_name")
+  prefectures String[] // 通知対象の都道府県（空=全関西）
+  teamIds     String[] @map("team_ids") // 特定チームを指定（空=全チーム）
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("line_subscriptions")
+}
+
+model Notification {
+  id               String             @id @default(cuid())
+  notificationType NotificationType   @map("notification_type")
+  title            String
+  message          String
+  targetUrl        String?            @map("target_url")
+  sentTo           String?            @map("sent_to")
+  status           NotificationStatus @default(PENDING)
+  sentAt           DateTime?          @map("sent_at")
+
+  createdAt        DateTime           @default(now()) @map("created_at")
+
+  @@map("notifications")
+}
+
+model AdminReview {
+  id            String       @id @default(cuid())
+  recruitmentId String       @map("recruitment_id")
+  reviewerName  String?      @map("reviewer_name")
+  status        ReviewStatus
+  note          String?
+  reviewedAt    DateTime     @default(now()) @map("reviewed_at")
+
+  recruitment   Recruitment  @relation(fields: [recruitmentId], references: [id], onDelete: Cascade)
+
+  @@map("admin_reviews")
+}
+
+// --- Enums ---
+
+enum TeamCategory {
+  J_YOUTH       // J下部
+  CLUB          // 街クラブ
+  SCHOOL        // スクール母体
+  OTHER
+}
+
+enum AgeGroup {
+  U13
+  U15
+}
+
+enum SourceType {
+  OFFICIAL_SITE
+  NEWS_PAGE
+  INSTAGRAM
+  X
+  FACEBOOK
+  ASSOCIATION
+  SEARCH
+  MANUAL
+}
+
+enum RecruitmentType {
+  SELECTION         // セレクション
+  TRIAL             // 体験練習会
+  BRIEFING          // 説明会
+  GENERAL           // 通常募集
+}
+
+enum RecruitmentStatus {
+  DETECTED    // 自動検知
+  PENDING     // 保留
+  CONFIRMED   // 確認済み
+  REJECTED    // 誤情報
+  ARCHIVED    // アーカイブ
+}
+
+enum ConfidenceLabel {
+  A   // 公式
+  B   // 協会・連盟
+  C   // 第三者
+  D   // AI推定
+}
+
+enum CrawlStatus {
+  SUCCESS
+  FAILED
+  SKIPPED
+}
+
+enum ChangeType {
+  NEW_RECRUITMENT
+  DATE_ADDED
+  DATE_CHANGED
+  DEADLINE_ADDED
+  DEADLINE_CHANGED
+  URL_ADDED
+  RECRUITMENT_CLOSED
+  PAGE_DELETED
+  SNS_POST_ADDED
+}
+
+enum NotificationType {
+  NEW_RECRUITMENT
+  SELECTION_DETECTED
+  TRIAL_DETECTED
+  DEADLINE_7DAYS
+  DEADLINE_3DAYS
+  DEADLINE_1DAY
+  DATE_CHANGED
+  URL_ADDED
+  HIGH_CONFIDENCE
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum ReviewStatus {
+  CONFIRMED
+  PENDING
+  REJECTED
+}
