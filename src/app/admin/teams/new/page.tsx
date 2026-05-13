@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import TeamForm from "../TeamForm";
 
 export default function NewTeamPage() {
