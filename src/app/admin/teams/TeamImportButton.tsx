@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Upload, RefreshCw } from "lucide-react";
+import { Upload, RefreshCw, CloudDownload } from "lucide-react";
 
 type Mode = "add" | "reset";
 
@@ -10,6 +10,37 @@ export default function TeamImportButton() {
   const resetRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  // GitHub rawからCSVを取得して同期
+  async function handleGitHubSync() {
+    if (
+      !window.confirm(
+        "GitHubのCSVからチームデータを自動同期します（既存データは全削除）。\nよろしいですか？"
+      )
+    )
+      return;
+
+    setLoading(true);
+    setResult(null);
+
+    try {
+      const res = await fetch("/api/cron/sync-teams", { method: "POST" });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setResult({
+          ok: true,
+          msg: `✓ ${data.deleted}件削除→${data.created}件登録、${data.skipped}件スキップ`,
+        });
+        setTimeout(() => window.location.reload(), 1800);
+      } else {
+        setResult({ ok: false, msg: `エラー: ${data.error ?? "不明なエラー"}` });
+      }
+    } catch {
+      setResult({ ok: false, msg: "同期に失敗しました" });
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleFile(file: File, mode: Mode) {
     if (
@@ -54,7 +85,17 @@ export default function TeamImportButton() {
 
   return (
     <div className="relative flex items-center gap-2">
-      {/* 追加インポート */}
+      {/* GitHub同期ボタン（メイン） */}
+      <button
+        onClick={handleGitHubSync}
+        disabled={loading}
+        className="flex items-center gap-2 bg-brand-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-brand-700 transition-colors disabled:opacity-50"
+      >
+        <CloudDownload size={16} />
+        {loading ? "同期中..." : "GitHub同期"}
+      </button>
+
+      {/* 追加インポート（CSVファイル指定） */}
       <button
         onClick={() => addRef.current?.click()}
         disabled={loading}
