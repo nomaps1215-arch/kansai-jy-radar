@@ -10,7 +10,7 @@ import {
   XCircle,
   Globe,
 } from "lucide-react";
-import { RunPipelineButton } from "./sources/CrawlButton";
+import { RunPipelineButton } from "./sources/RunPipelineButton";
 
 async function getDashboardStats() {
   const now = new Date();

@@ -2,7 +2,8 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { SOURCE_TYPE_LABELS, formatDateTime, PREFECTURES } from "@/lib/utils";
 import { Plus, CheckCircle, XCircle } from "lucide-react";
-import { CrawlButton, RunPipelineButton } from "./CrawlButton";
+import { CrawlButton } from "./CrawlButton"
+import { RunPipelineButton } from "./RunPipelineButton";
 
 export const dynamic = "force-dynamic";
 
