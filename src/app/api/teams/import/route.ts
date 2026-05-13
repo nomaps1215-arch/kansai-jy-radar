@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
+    const clearFirst = formData.get("clearFirst") === "true";
 
     if (!file) {
       return NextResponse.json({ error: "ファイルが必要です" }, { status: 400 });
@@ -46,7 +47,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "データが見つかりません" }, { status: 400 });
     }
 
-    const results = { created: 0, skipped: 0, errors: [] as string[] };
+    // 一新モード: 既存チームを全削除（関連データはCascadeで自動削除）
+    let deleted = 0;
+    if (clearFirst) {
+      const del = await prisma.team.deleteMany({});
+      deleted = del.count;
+    }
+
+    const results = { deleted, created: 0, skipped: 0, errors: [] as string[] };
 
     for (const row of rows) {
       const name = row["name"]?.trim();
