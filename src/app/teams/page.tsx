@@ -11,11 +11,25 @@ export const dynamic = "force-dynamic";
 export default async function TeamsPublicPage({
   searchParams,
 }: {
-  searchParams: Promise<{ prefecture?: string; category?: string; league?: string; compareIds?: string; area?: string }>;
+  searchParams: Promise<{ prefecture?: string; category?: string; league?: string; compareIds?: string; area?: string; city?: string }>;
 }) {
   const sp = await searchParams;
   const compareIds = sp.compareIds?.split(",").filter(Boolean) ?? [];
   const area = sp.area ?? "";
+  const cityFilter = sp.city ?? "";
+
+  // 選択中の都道府県に絞った市区町村一覧を取得
+  const cityRows = await prisma.team.findMany({
+    where: {
+      isActive: true,
+      ...(sp.prefecture ? { prefecture: sp.prefecture } : {}),
+      city: { not: null },
+    },
+    select: { city: true },
+    distinct: ["city"],
+    orderBy: { city: "asc" },
+  });
+  const cities = cityRows.map((r) => r.city!).filter(Boolean);
 
   const teams = await prisma.team.findMany({
     where: {
@@ -25,7 +39,9 @@ export default async function TeamsPublicPage({
       ...(sp.league
         ? { standings: { some: { leagueName: sp.league, season: CURRENT_SEASON } } }
         : {}),
-      ...(area
+      ...(cityFilter
+        ? { city: { contains: cityFilter } }
+        : area
         ? {
             OR: [
               { city: { contains: area } },
@@ -117,12 +133,16 @@ export default async function TeamsPublicPage({
             </optgroup>
           </select>
 
-          <input
-            name="area"
-            defaultValue={area}
-            placeholder="エリア・市区町村..."
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 w-40"
-          />
+          <select
+            name="city"
+            defaultValue={cityFilter}
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            <option value="">市区町村：すべて</option>
+            {cities.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
 
           <button
             type="submit"
@@ -130,7 +150,7 @@ export default async function TeamsPublicPage({
           >
             絞り込む
           </button>
-          {(sp.prefecture || sp.category || sp.league || area) && (
+          {(sp.prefecture || sp.category || sp.league || area || cityFilter) && (
             <a
               href="/teams"
               className="text-sm text-gray-400 hover:text-gray-600 py-1.5"
@@ -240,6 +260,7 @@ export default async function TeamsPublicPage({
                             ...(sp.prefecture ? { prefecture: sp.prefecture } : {}),
                             ...(sp.category ? { category: sp.category } : {}),
                             ...(sp.league ? { league: sp.league } : {}),
+                            ...(cityFilter ? { city: cityFilter } : {}),
                             ...(nextIds.length > 0 ? { compareIds: nextIds.join(",") } : {}),
                           }).toString()}`;
                           return (
