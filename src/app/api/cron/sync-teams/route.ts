@@ -129,25 +129,7 @@ export async function GET(req: Request) {
   }
 }
 
-// 管理画面から手動実行（Supabase セッション認証）
+// 管理画面から手動実行（認証はミドルウェアで保護）
 export async function POST(req: Request) {
-  const { createServerClient } = await import('@supabase/ssr')
-  const { cookies } = await import('next/headers')
-  const cookieStore = await cookies()
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-        setAll: () => {},
-      },
-    }
-  )
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
   return GET(req)
 }

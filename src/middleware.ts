@@ -37,6 +37,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // /api/cron の POST は管理者セッション必須（GET は Vercel cron が CRON_SECRET で認証）
+  if (
+    request.nextUrl.pathname.startsWith("/api/cron") &&
+    request.method === "POST" &&
+    !user
+  ) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   // /admin 以下は認証必須（/admin/login は除く）
   if (
     request.nextUrl.pathname.startsWith("/admin") &&
@@ -59,5 +68,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*"],
+  matcher: ["/admin/:path*", "/api/admin/:path*", "/api/cron/:path*"],
 };
