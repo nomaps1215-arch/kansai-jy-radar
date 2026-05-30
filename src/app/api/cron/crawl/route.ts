@@ -1,9 +1,11 @@
 export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { runSourceCrawl, runGoogleDiscovery, runAiExtraction } from '@/lib/crawler/pipeline'
+import { runDeadlineNotifications } from '@/lib/notifications/deadline'
 
-// Vercel Cron: 毎時00分に実行
-// vercel.json: { "path": "/api/cron/crawl", "schedule": "0 * * * *" }
+// Vercel Cron: 毎日19:00 UTC (04:00 JST)
+// vercel.json: { "path": "/api/cron/crawl", "schedule": "0 19 * * *" }
+// Hobby プランの2枠目（1枠目: sync-teams）
 export async function GET(req: Request) {
   // Cron Secret 認証（Vercel が Authorization ヘッダーをセットする）
   const authHeader = req.headers.get('authorization')
@@ -20,15 +22,19 @@ export async function GET(req: Request) {
   try {
     // Phase A: 登録ソース巡回
     const crawlResult = await runSourceCrawl()
-    log.push(`[A] source crawl: processed=${crawlResult.processed} changed=${crawlResult.changed} errors=${crawlResult.errors}`)
+    log.push(`[A] crawl: processed=${crawlResult.processed} changed=${crawlResult.changed} errors=${crawlResult.errors}`)
 
     // Phase B: Google Search 新規URL発見
     const searchResult = await runGoogleDiscovery()
-    log.push(`[B] google search: teams=${searchResult.teamsSearched} newUrls=${searchResult.newUrls}`)
+    log.push(`[B] google: teams=${searchResult.teamsSearched} newUrls=${searchResult.newUrls}`)
 
     // Phase C: AI抽出
     const extractResult = await runAiExtraction()
-    log.push(`[C] ai extract: processed=${extractResult.processed} found=${extractResult.found}`)
+    log.push(`[C] ai: processed=${extractResult.processed} found=${extractResult.found}`)
+
+    // Phase D: 締切通知（notify cronを統合）
+    const notifyResult = await runDeadlineNotifications()
+    log.push(`[D] notify: sent=${notifyResult.sent}`)
 
     const elapsed = Date.now() - start
     log.push(`[done] ${elapsed}ms`)

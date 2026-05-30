@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
 import { CheckCircle, XCircle, MinusCircle } from "lucide-react";
+import CrawlRunButton from "./CrawlRunButton";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,10 @@ export default async function CrawlLogsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">クロールログ</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">クロールログ</h1>
+        <CrawlRunButton />
+      </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 text-sm text-gray-500">

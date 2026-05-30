@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Upload, RefreshCw, CloudDownload } from "lucide-react";
+import { Upload, RefreshCw, CloudDownload, Search } from "lucide-react";
 
 type Mode = "add" | "reset";
 
@@ -9,6 +9,7 @@ export default function TeamImportButton() {
   const addRef = useRef<HTMLInputElement>(null);
   const resetRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
+  const [seedLoading, setSeedLoading] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   // GitHub rawからCSVを取得して同期
@@ -39,6 +40,57 @@ export default function TeamImportButton() {
       setResult({ ok: false, msg: "同期に失敗しました" });
     } finally {
       setLoading(false);
+    }
+  }
+
+  // 全チーム一括Google探索＆ソース登録
+  async function handleSeedSources() {
+    if (
+      !window.confirm(
+        "全チームをGoogle検索してソースURLを自動登録します。\n処理に数分かかります。\nよろしいですか？"
+      )
+    )
+      return;
+
+    setSeedLoading(true);
+    setResult(null);
+
+    let offset = 0;
+    let totalNewSources = 0;
+    let totalNewPages = 0;
+    let hasMore = true;
+
+    try {
+      while (hasMore) {
+        const res = await fetch("/api/admin/seed-sources", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ offset }),
+        });
+        const data = await res.json();
+
+        if (!res.ok || !data.ok) {
+          setResult({ ok: false, msg: `エラー: ${data.error ?? "不明なエラー"}` });
+          return;
+        }
+
+        totalNewSources += data.newSources ?? 0;
+        totalNewPages += data.newPages ?? 0;
+        hasMore = data.hasMore ?? false;
+        offset = data.nextOffset ?? offset + 30;
+
+        // Google API レート制限対策: バッチ間に少し待機
+        if (hasMore) await new Promise((r) => setTimeout(r, 1000));
+      }
+
+      setResult({
+        ok: true,
+        msg: `✓ 新規ソース ${totalNewSources}件・検出ページ ${totalNewPages}件 登録完了`,
+      });
+    } catch {
+      setResult({ ok: false, msg: "一括探索に失敗しました" });
+    } finally {
+      setSeedLoading(false);
     }
   }
 
@@ -93,6 +145,16 @@ export default function TeamImportButton() {
       >
         <CloudDownload size={16} />
         {loading ? "同期中..." : "GitHub同期"}
+      </button>
+
+      {/* 全チーム一括探索 */}
+      <button
+        onClick={handleSeedSources}
+        disabled={loading || seedLoading}
+        className="flex items-center gap-2 bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50"
+      >
+        <Search size={16} />
+        {seedLoading ? "探索中..." : "全チーム一括探索"}
       </button>
 
       {/* 追加インポート（CSVファイル指定） */}

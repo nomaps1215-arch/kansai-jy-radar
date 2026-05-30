@@ -29,6 +29,14 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // /api/admin 以下は認証必須（API は 401 を返す）
+  if (
+    request.nextUrl.pathname.startsWith("/api/admin") &&
+    !user
+  ) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   // /admin 以下は認証必須（/admin/login は除く）
   if (
     request.nextUrl.pathname.startsWith("/admin") &&
@@ -51,5 +59,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/api/admin/:path*"],
 };

@@ -226,13 +226,18 @@ export async function runAiExtraction(): Promise<{ processed: number; found: num
     })
     if (duplicate) continue
 
+    // 信頼度A/Bは自動公開、C/Dは管理者承認待ち
+    const autoPublish = ['A', 'B'].includes(extracted.confidence ?? '')
+    const now2 = new Date()
+
     // Recruitment レコード作成
-    const recruitment = await prisma.recruitment.create({
+    await prisma.recruitment.create({
       data: {
         teamId: page.teamId!,
         title: extracted.title ?? `${page.team.name} ジュニアユース募集情報`,
         recruitmentType: (extracted.recruitmentType ?? 'GENERAL') as any,
-        status: 'DETECTED',
+        status: autoPublish ? 'CONFIRMED' : 'DETECTED',
+        publishedAt: autoPublish ? now2 : null,
         eventDate: extracted.eventDates?.[0] ? new Date(extracted.eventDates[0]) : null,
         venue: extracted.venue ?? null,
         address: extracted.address ?? null,
@@ -255,8 +260,8 @@ export async function runAiExtraction(): Promise<{ processed: number; found: num
       },
     })
 
-    // 公式情報（信頼度A/B）はLINE即時通知
-    if (['A', 'B'].includes(extracted.confidence ?? '')) {
+    // 信頼度A/B → 自動公開済みなので即時LINE通知
+    if (autoPublish) {
       await notifyNewRecruitment({
         teamName: page.team.name,
         prefecture: page.team.prefecture,
