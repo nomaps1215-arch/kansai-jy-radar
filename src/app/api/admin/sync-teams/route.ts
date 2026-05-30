@@ -36,52 +36,63 @@ export async function POST() {
     if (rows.length === 0) return NextResponse.json({ error: 'CSVが空です' }, { status: 400 })
 
     const { count: deleted } = await prisma.team.deleteMany({})
-    let created = 0, skipped = 0, sourcesCreated = 0
-    const errors: string[] = []
+    let skipped = 0
 
-    for (const row of rows) {
+    // 有効な行のみ抽出
+    const validRows = rows.filter(row => {
       const name = row['name']?.trim()
       const prefecture = row['prefecture']?.trim()
-      if (!name || !prefecture) { skipped++; continue }
+      if (!name || !prefecture) { skipped++; return false }
+      return true
+    })
 
-      try {
-        const team = await prisma.team.create({
-          data: {
-            name,
-            nameKana: row['name_kana'] || null,
-            prefecture,
-            city: row['city'] || null,
-            category: CATEGORY_MAP[row['category'] ?? ''] ?? 'CLUB',
-            league: row['league'] || null,
-            trainingArea: row['training_area'] || null,
-            homeGround: row['home_ground'] || null,
-            officialSiteUrl: row['official_site_url'] || null,
-            instagramUrl: row['instagram_url'] || null,
-            xUrl: row['x_url'] || null,
-            facebookUrl: row['facebook_url'] || null,
-            memo: row['memo'] || null,
-          },
-        })
-        created++
+    // 全チームを一括登録
+    await prisma.team.createMany({
+      data: validRows.map(row => ({
+        name: row['name'].trim(),
+        nameKana: row['name_kana'] || null,
+        prefecture: row['prefecture'].trim(),
+        city: row['city'] || null,
+        category: CATEGORY_MAP[row['category'] ?? ''] ?? 'CLUB',
+        league: row['league'] || null,
+        trainingArea: row['training_area'] || null,
+        homeGround: row['home_ground'] || null,
+        officialSiteUrl: row['official_site_url'] || null,
+        instagramUrl: row['instagram_url'] || null,
+        xUrl: row['x_url'] || null,
+        facebookUrl: row['facebook_url'] || null,
+        memo: row['memo'] || null,
+      })),
+      skipDuplicates: true,
+    })
 
-        const urlSources: { url: string; sourceType: string }[] = []
-        if (row['official_site_url']) urlSources.push({ url: row['official_site_url'], sourceType: 'OFFICIAL_SITE' })
-        if (row['instagram_url'])     urlSources.push({ url: row['instagram_url'],     sourceType: 'INSTAGRAM' })
-        if (row['x_url'])             urlSources.push({ url: row['x_url'],             sourceType: 'X' })
-        if (row['facebook_url'])      urlSources.push({ url: row['facebook_url'],      sourceType: 'FACEBOOK' })
+    const created = validRows.length - skipped
 
-        for (const s of urlSources) {
-          await prisma.teamSource.create({
-            data: { teamId: team.id, sourceType: s.sourceType as any, url: s.url, crawlEnabled: true, crawlIntervalHours: 24 },
-          }).catch(() => {})
-          sourcesCreated++
-        }
-      } catch (err) {
-        errors.push(`${name}: ${String(err)}`); skipped++
-      }
+    // 登録したチームのIDを取得
+    const teams = await prisma.team.findMany({
+      select: { id: true, name: true, officialSiteUrl: true, instagramUrl: true, xUrl: true, facebookUrl: true },
+    })
+
+    // チーム名→IDのマップ
+    const teamMap = new Map(teams.map(t => [t.name, t]))
+
+    // ソースを一括登録
+    const sourcesToCreate: { teamId: string; sourceType: string; url: string; crawlEnabled: boolean; crawlIntervalHours: number }[] = []
+    for (const row of validRows) {
+      const team = teamMap.get(row['name'].trim())
+      if (!team) continue
+      if (row['official_site_url']) sourcesToCreate.push({ teamId: team.id, sourceType: 'OFFICIAL_SITE', url: row['official_site_url'], crawlEnabled: true, crawlIntervalHours: 24 })
+      if (row['instagram_url'])     sourcesToCreate.push({ teamId: team.id, sourceType: 'INSTAGRAM',     url: row['instagram_url'],     crawlEnabled: true, crawlIntervalHours: 24 })
+      if (row['x_url'])             sourcesToCreate.push({ teamId: team.id, sourceType: 'X',             url: row['x_url'],             crawlEnabled: true, crawlIntervalHours: 24 })
+      if (row['facebook_url'])      sourcesToCreate.push({ teamId: team.id, sourceType: 'FACEBOOK',      url: row['facebook_url'],      crawlEnabled: true, crawlIntervalHours: 24 })
     }
 
-    return NextResponse.json({ ok: true, deleted, created, skipped, sourcesCreated, errors, elapsed: Date.now() - start })
+    const { count: sourcesCreated } = await prisma.teamSource.createMany({
+      data: sourcesToCreate as any,
+      skipDuplicates: true,
+    })
+
+    return NextResponse.json({ ok: true, deleted, created, skipped, sourcesCreated, errors: [], elapsed: Date.now() - start })
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 })
   }
