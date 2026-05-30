@@ -14,7 +14,7 @@ export default function CrawlRunButton() {
     setResult(null);
 
     try {
-      const res = await fetch("/api/cron/crawl", { method: "POST" });
+      const res = await fetch("/api/admin/crawl-run", { method: "POST" });
       const data = await res.json();
 
       if (data.ok) {

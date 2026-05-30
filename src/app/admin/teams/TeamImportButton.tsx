@@ -25,7 +25,7 @@ export default function TeamImportButton() {
     setResult(null);
 
     try {
-      const res = await fetch("/api/cron/sync-teams", { method: "POST" });
+      const res = await fetch("/api/admin/sync-teams", { method: "POST" });
       const data = await res.json();
       if (res.ok && data.ok) {
         setResult({
