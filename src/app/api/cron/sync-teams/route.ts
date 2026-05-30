@@ -67,13 +67,15 @@ export async function GET(req: Request) {
     let skipped = 0
     const errors: string[] = []
 
+    let sourcesCreated = 0
+
     for (const row of rows) {
       const name = row['name']?.trim()
       const prefecture = row['prefecture']?.trim()
       if (!name || !prefecture) { skipped++; continue }
 
       try {
-        await prisma.team.create({
+        const team = await prisma.team.create({
           data: {
             name,
             nameKana: row['name_kana'] || null,
@@ -91,6 +93,26 @@ export async function GET(req: Request) {
           },
         })
         created++
+
+        // CSVのURLからソースを自動登録
+        const urlSources: { url: string; sourceType: string }[] = []
+        if (row['official_site_url']) urlSources.push({ url: row['official_site_url'], sourceType: 'OFFICIAL_SITE' })
+        if (row['instagram_url'])     urlSources.push({ url: row['instagram_url'],     sourceType: 'INSTAGRAM' })
+        if (row['x_url'])             urlSources.push({ url: row['x_url'],             sourceType: 'X' })
+        if (row['facebook_url'])      urlSources.push({ url: row['facebook_url'],      sourceType: 'FACEBOOK' })
+
+        for (const s of urlSources) {
+          await prisma.teamSource.create({
+            data: {
+              teamId: team.id,
+              sourceType: s.sourceType as any,
+              url: s.url,
+              crawlEnabled: true,
+              crawlIntervalHours: 24,
+            },
+          }).catch(() => {}) // URL重複は無視
+          sourcesCreated++
+        }
       } catch (err) {
         errors.push(`${name}: ${String(err)}`)
         skipped++
@@ -98,9 +120,9 @@ export async function GET(req: Request) {
     }
 
     const elapsed = Date.now() - start
-    console.log(`[cron/sync-teams] deleted=${deleted} created=${created} skipped=${skipped} elapsed=${elapsed}ms`)
+    console.log(`[cron/sync-teams] deleted=${deleted} created=${created} skipped=${skipped} sources=${sourcesCreated} elapsed=${elapsed}ms`)
 
-    return NextResponse.json({ ok: true, deleted, created, skipped, errors, elapsed })
+    return NextResponse.json({ ok: true, deleted, created, skipped, sourcesCreated, errors, elapsed })
   } catch (e) {
     console.error('[cron/sync-teams]', e)
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 })

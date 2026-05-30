@@ -12,8 +12,8 @@ import { searchTeamRecruitment, classifySourceUrl } from './google-search'
 import { extractRecruitmentInfo, quickCheck } from '@/lib/extractor/claude'
 import { notifyNewRecruitment } from '@/lib/notifications/line'
 
-const CRAWL_BATCH = 20  // 1回のcronで処理するソース数
-const SEARCH_BATCH = 10 // 1回のcronで検索するチーム数
+const CRAWL_BATCH = 30  // 1回のcronで処理するソース数
+const SEARCH_BATCH = 30 // 1回のcronで検索するチーム数（Google無料枠: 100/日、3クエリ×30=90）
 
 // ── Phase A: 登録ソースURLの巡回 ──────────────────────────────────
 export async function runSourceCrawl(): Promise<{ processed: number; changed: number; errors: number }> {
